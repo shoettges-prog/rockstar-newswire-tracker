@@ -1,0 +1,46 @@
+name: Regenerate package-lock
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write  # allow committing/pushing updated lockfile
+
+jobs:
+  regen:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (fetch full history)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Regenerate package-lock.json
+        run: |
+          # Remove old lockfile to ensure a clean regen
+          rm -f package-lock.json
+          # Regenerate lockfile consistent with package.json (fast)
+          npm install --package-lock-only
+
+      - name: Commit and push lockfile
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # Create or switch to branch
+          git checkout -b regenerate-lockfile || git checkout regenerate-lockfile
+          git add package-lock.json
+          if git diff --cached --quiet; then
+            echo "No changes to package-lock.json. Nothing to push."
+            exit 0
+          fi
+          git commit -m "chore: regenerate package-lock.json for Node 20 compatibility"
+          git push --set-upstream origin regenerate-lockfile
+          echo "Pushed branch regenerate-lockfile — create a PR to merge the lockfile update."
